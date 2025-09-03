@@ -1,12 +1,10 @@
 {
   "functions": {
     "api/*.py": {
-      "runtime": "python3.12",
+      "runtime": "@vercel/python@3.12",
       "maxDuration": 30,
       "memory": 1024
     }
   },
-  "regions": [
-    "sin1"
-  ]
+  "regions": ["sin1"]
 }
