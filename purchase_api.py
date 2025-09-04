@@ -155,15 +155,19 @@ def settlement_multipayment(
         print("[decrypt err]", e)
         return resp.text
 
-def show_multipayment(
-    api_key: str,
-    tokens: dict,
-    package_option_code: str,
-    token_confirmation: str,
-    price: int,
-    payment_method: str,
-    wallet_number: str = ""
-):
+def show_multipayment(api_key: str, tokens: dict, package_option_code: str, token_confirmation: str, price: int, payment_method: str, wallet_number: str = ""):
+    ...
+    settlement_response = settlement_multipayment(
+        api_key,
+        tokens,
+        token_payment,
+        ts_to_sign,
+        package_option_code,
+        price,
+        wallet_number,
+        "",
+        payment_method
+    ):
     print(f"Melanjutkan pembayaran dengan metode {payment_method} ...")
 
     payment_methods_data = get_payment_methods(
