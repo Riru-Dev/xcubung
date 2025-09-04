@@ -26,14 +26,15 @@ def get_payment_methods(
     }
     
     payment_res = send_api_request(api_key, payment_path, payment_payload, tokens["id_token"], "POST")
-    if payment_res["status"] != "SUCCESS":
-        print("Failed to fetch payment methods.")
-        print(f"Error: {payment_res}")
-        return None
     
+    # ✅ aman, gak balikin None lagi
+    if payment_res.get("status") != "SUCCESS":
+        return {
+            "error": "Failed to fetch payment methods",
+            "raw": payment_res
+        }
     
-    
-    return payment_res["data"]
+    return payment_res.get("data", {})
 
 def settlement_multipayment(
     api_key: str,
