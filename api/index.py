@@ -7,7 +7,7 @@ import os
 import crypto_helper as ch
 from api_request import (
     get_otp, submit_otp, get_new_token, get_profile,
-    get_balance, send_api_request, get_family, get_package
+    get_balance, send_api_request, get_family, get_package, purchase_package
 )
 from purchase_api import (
     get_payment_methods, get_qris_code
