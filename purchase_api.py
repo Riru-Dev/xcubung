@@ -59,87 +59,61 @@ def settlement_multipayment(
 ):
     path = "payments/api/v8/settlement-multipayment/ewallet"
 
+    # timestamp HARUS epoch time sekarang
+    now_ts = int(time.time())
+
     settlement_payload = {
-        "akrab": {"akrab_members": [], "akrab_parent_alias": "", "members": []},
-        "can_trigger_rating": False,
-        "total_discount": 0,
-        "coupon": "",
         "payment_for": "BUY_PACKAGE",
-        "topup_number": "",    # WAJIB ada walau kosong
         "is_enterprise": False,
-        "autobuy": {
-            "is_using_autobuy": False,
-            "activated_autobuy_code": "",
-            "autobuy_threshold_setting": {"label": "", "type": "", "value": 0},
-        },
-        "cc_payment_type": "",
         "access_token": tokens["access_token"],
-        "is_myxl_wallet": False,
-        "wallet_number": wallet_number,   # OVO/DANA isi nomor, GOPAY/SHOPEEPAY kosong
+        "wallet_number": wallet_number,
+        "verification_token": token_payment,
+        "token_confirmation": token_payment,   # ⚠️ tambah ini
+        "payment_method": payment_method,
+        "total_amount": price,
+        "lang": "en",
+        "items": [{
+            "item_code": payment_target,
+            "item_price": price,
+            "item_name": item_name,
+            "tax": 0,
+            "product_type": ""
+        }],
         "additional_data": {
             "original_price": price,
-            "is_spend_limit_temporary": False,
-            "migration_type": "",
-            "spend_limit_amount": 0,
-            "is_spend_limit": False,
             "tax": 0,
-            "benefit_type": "",
-            "quota_bonus": 0,
-            "cashtag": "",
-            "is_family_plan": False,
-            "combo_details": [],
-            "is_switch_plan": False,
-            "discount_recurring": 0,
-            "has_bonus": False,
-            "discount_promo": 0,
+            "is_spend_limit": False,
+            "discount_promo": 0
         },
-        "total_amount": price,
-        "total_fee": 0,
-        "is_use_point": False,
-        "lang": "en",
-        "items": [
-            {
-                "item_code": payment_target,
-                "product_type": "",
-                "item_price": price,
-                "item_name": item_name,
-                "tax": 0,
-            }
-        ],
-        "verification_token": token_payment,
-        "payment_method": payment_method,
-        "timestamp": ts_to_sign,  # HARUS pakai dari /pay/methods
+        "timestamp": now_ts   # ⚠️ BUKAN ts_to_sign
     }
 
-    # === Encrypt + sign (tetap sama) ===
     encrypted_payload = encryptsign_xdata(
         api_key=api_key,
         method="POST",
         path=path,
         id_token=tokens["id_token"],
-        payload=settlement_payload,
+        payload=settlement_payload
     )
 
     xtime = int(encrypted_payload["encrypted_body"]["xtime"])
     sig_time_sec = (xtime // 1000)
     x_requested_at = datetime.fromtimestamp(sig_time_sec, tz=timezone.utc).astimezone()
-
     body = encrypted_payload["encrypted_body"]
 
-    # Signature khusus multipayment
     x_sig = get_x_signature_payment(
         api_key,
         tokens["access_token"],
-        ts_to_sign,
+        ts_to_sign,        # ini masih pakai dari /pay/methods
         payment_target,
         token_payment,
-        payment_method,
+        payment_method
     )
 
     headers = {
         "host": "api.myxl.xlaxiata.co.id",
         "content-type": "application/json; charset=utf-8",
-        "user-agent": "myXL / 8.6.0(1179); com.android.vending; (samsung; SM-N935F; SDK 33; Android 13)",
+        "user-agent": "myXL / 8.6.0(1179)",
         "x-api-key": API_KEY,
         "authorization": f"Bearer {tokens['id_token']}",
         "x-hv": "v3",
@@ -154,8 +128,7 @@ def settlement_multipayment(
     resp = requests.post(url, headers=headers, data=json.dumps(body), timeout=30)
 
     try:
-        decrypted_body = decrypt_xdata(api_key, resp.json())
-        return decrypted_body
+        return decrypt_xdata(api_key, resp.json())
     except Exception as e:
         return {"error": str(e), "raw": resp.text}
 
