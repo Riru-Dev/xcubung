@@ -3,10 +3,19 @@ import json
 import uuid
 import base64
 import qrcode
-
+import time
 import requests
-from api_request import *
-from crypto_helper import API_KEY, build_encrypted_field, decrypt_xdata, encryptsign_xdata, java_like_timestamp, get_x_signature_payment, get_x_signature_bounty
+
+from api_request import send_api_request
+from crypto_helper import (
+    API_KEY,
+    build_encrypted_field,
+    decrypt_xdata,
+    encryptsign_xdata,
+    java_like_timestamp,
+    get_x_signature_payment,
+    get_x_signature_bounty
+)
 import time
 
 def get_payment_methods(
@@ -25,9 +34,10 @@ def get_payment_methods(
         "token_confirmation": token_confirmation
     }
     
-    payment_res = send_api_request(api_key, payment_path, payment_payload, tokens["id_token"], "POST")
+    payment_res = send_api_request(
+        api_key, payment_path, payment_payload, tokens["id_token"], "POST"
+    )
     
-    # ✅ aman, gak balikin None lagi
     if payment_res.get("status") != "SUCCESS":
         return {
             "error": "Failed to fetch payment methods",
@@ -47,8 +57,8 @@ def settlement_multipayment(
     item_name: str = "",
     payment_method: str = "DANA"
 ):
-    # Settlement request
     path = "payments/api/v8/settlement-multipayment/ewallet"
+
     settlement_payload = {
         "akrab": {
             "akrab_members": [],
@@ -65,9 +75,9 @@ def settlement_multipayment(
             "is_using_autobuy": False,
             "activated_autobuy_code": "",
             "autobuy_threshold_setting": {
-            "label": "",
-            "type": "",
-            "value": 0
+                "label": "",
+                "type": "",
+                "value": 0
             }
         },
         "cc_payment_type": "",
@@ -104,9 +114,10 @@ def settlement_multipayment(
         }],
         "verification_token": token_payment,
         "payment_method": payment_method,
-        "timestamp": int(time.time())
+        "timestamp": ts_to_sign  # ⚠️ pakai dari /pay/methods, bukan time.time()
     }
-    
+
+    # Encrypt + sign
     encrypted_payload = encryptsign_xdata(
         api_key=api_key,
         method="POST",
@@ -114,22 +125,23 @@ def settlement_multipayment(
         id_token=tokens["id_token"],
         payload=settlement_payload
     )
-    
+
     xtime = int(encrypted_payload["encrypted_body"]["xtime"])
     sig_time_sec = (xtime // 1000)
     x_requested_at = datetime.fromtimestamp(sig_time_sec, tz=timezone.utc).astimezone()
-    settlement_payload["timestamp"] = ts_to_sign
-    
+
     body = encrypted_payload["encrypted_body"]
+
+    # Signature khusus multipayment
     x_sig = get_x_signature_payment(
-            api_key,
-            tokens["access_token"],
-            ts_to_sign,
-            payment_target,
-            token_payment,
-            payment_method
-        )
-    
+        api_key,
+        tokens["access_token"],
+        ts_to_sign,
+        payment_target,
+        token_payment,
+        payment_method
+    )
+
     headers = {
         "host": "api.myxl.xlaxiata.co.id",
         "content-type": "application/json; charset=utf-8",
@@ -143,21 +155,25 @@ def settlement_multipayment(
         "x-request-at": java_like_timestamp(x_requested_at),
         "x-version-app": "8.6.0",
     }
-    
+
     url = f"https://api.myxl.xlaxiata.co.id/{path}"
-    print("Sending settlement request...")
     resp = requests.post(url, headers=headers, data=json.dumps(body), timeout=30)
-    
+
     try:
-        decrypted_body = decrypt_xdata(api_key, json.loads(resp.text))
+        decrypted_body = decrypt_xdata(api_key, resp.json())
         return decrypted_body
     except Exception as e:
-        print("[decrypt err]", e)
-        return resp.text
+        return {"error": str(e), "raw": resp.text}
 
-def show_multipayment(api_key: str, tokens: dict, package_option_code: str, token_confirmation: str, price: int, payment_method: str, wallet_number: str = ""):
-    ...
-    settlement_response = settlement_multipayment(
+def show_multipayment(api_key, tokens, package_option_code, token_confirmation, price, method, wallet_number=""):
+    pm_data = get_payment_methods(api_key, tokens, token_confirmation, package_option_code)
+    if "error" in pm_data:
+        return pm_data
+
+    token_payment = pm_data["token_payment"]
+    ts_to_sign = pm_data["timestamp"]
+
+    settlement_res = settlement_multipayment(
         api_key,
         tokens,
         token_payment,
@@ -166,45 +182,9 @@ def show_multipayment(api_key: str, tokens: dict, package_option_code: str, toke
         price,
         wallet_number,
         "",
-        payment_method
-    ):
-    print(f"Melanjutkan pembayaran dengan metode {payment_method} ...")
-
-    payment_methods_data = get_payment_methods(
-        api_key=api_key,
-        tokens=tokens,
-        token_confirmation=token_confirmation,
-        payment_target=package_option_code,
+        method
     )
-
-    token_payment = payment_methods_data["token_payment"]
-    ts_to_sign = payment_methods_data["timestamp"]
-
-    settlement_response = settlement_multipayment(
-        api_key,
-        tokens,
-        token_payment,
-        ts_to_sign,
-        package_option_code,
-        price,
-        wallet_number,
-        "",
-        payment_method
-    )
-
-    if settlement_response.get("status") != "SUCCESS":
-        return {
-            "error": "Failed to initiate settlement",
-            "raw": settlement_response
-        }
-
-    deeplink = settlement_response["data"].get("deeplink", "")
-    return {
-        "status": "SUCCESS",
-        "payment_method": payment_method,
-        "deeplink": deeplink or None,
-        "data": settlement_response["data"]
-    }
+    return settlement_res
 
 def settlement_qris(
     api_key: str,
@@ -537,3 +517,4 @@ def settlement_bounty(
     except Exception as e:
         print("[decrypt err]", e)
         return resp.text
+        
