@@ -11,10 +11,10 @@ def validate_contact(contact: str) -> bool:
         return False
     return True
 
-def get_otp(contact: str) -> str:
+def get_otp(contact: str):
     # Contact example: "6287896089467"
     if not validate_contact(contact):
-        return None
+        return {"error": "Invalid contact format. Must start with 628."}
     
     url = "https://gede.ciam.xlaxiata.co.id/realms/xl-ciam/auth/otp"
 
@@ -46,18 +46,19 @@ def get_otp(contact: str) -> str:
 
     print("Requesting OTP...")
     try:
-        response = requests.request("GET", url, data=payload, headers=headers, params=querystring, timeout=30)
+        response = requests.request(
+            "GET", url,
+            data=payload,
+            headers=headers,
+            params=querystring,
+            timeout=30
+        )
         print("response body", response.text)
-        json_body = json.loads(response.text)
-    
-        if "subscriber_id" not in json_body:
-            print(json_body.get("error", "No error message in response"))
-            raise ValueError("Subscriber ID not found in response")
-        
-        return json_body["subscriber_id"]
+        # Balikin raw JSON penuh, gak dipotong
+        return response.json()
     except Exception as e:
         print(f"Error requesting OTP: {e}")
-        return None
+        return {"error": str(e)}
     
 def submit_otp(api_key: str, contact: str, code: str):
     if not validate_contact(contact):
