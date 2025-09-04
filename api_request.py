@@ -460,21 +460,52 @@ def purchase_package(api_key: str, tokens: dict, package_option_code: str, price
 
         # === Step 2: Settlement ===
         settlement_payload = {
-            "total_discount": 0,
-            "is_enterprise": False,
-            "payment_token": "",
-            "token_payment": token_payment,
-            "payment_method": "BALANCE",
-            "lang": "en",
-            "timestamp": int(time.time()),
-            "token_confirmation": token_confirmation,
-            "access_token": tokens.get("access_token"),
-            "total_amount": amount_int,
-            "items": [{
-                "item_code": payment_target,
-                "item_price": amount_int,
-                "tax": 0
-            }]
+    "total_discount": 0,
+    "is_enterprise": False,
+    "payment_token": "",
+    "token_payment": token_payment,
+    "activated_autobuy_code": "",
+    "cc_payment_type": "",
+    "is_myxl_wallet": False,
+    "pin": "",
+    "ewallet_promo_id": "",
+    "members": [],
+    "total_fee": 0,
+    "fingerprint": "",
+    "autobuy_threshold_setting": {"label": "", "type": "", "value": 0},
+    "is_use_point": False,
+    "lang": "en",
+    "payment_method": "BALANCE",
+    "timestamp": ts_to_sign,   # ⚠️ jangan pakai time.time()
+    "points_gained": 0,
+    "can_trigger_rating": False,
+    "akrab_members": [],
+    "akrab_parent_alias": "",
+    "referral_unique_code": "",
+    "coupon": "",
+    "payment_for": "BUY_PACKAGE",
+    "with_upsell": False,
+    "topup_number": "",
+    "stage_token": "",
+    "authentication_id": "",
+    "encrypted_payment_token": build_encrypted_field(urlsafe_b64=True),
+    "token": "",
+    "token_confirmation": token_confirmation,
+    "access_token": tokens["access_token"],
+    "wallet_number": "",
+    "encrypted_authentication_id": build_encrypted_field(urlsafe_b64=True),
+    "additional_data": {
+        "original_price": amount_int
+    },
+    "total_amount": amount_int,   # ⚠️ harga asli / override
+    "is_using_autobuy": False,
+    "items": [{
+        "item_code": payment_target,
+        "product_type": "",
+        "item_price": amount_int,   # ⚠️ bukan 0
+        "item_name": "",
+        "tax": 0
+    }]
         }
         result["data"]["settlement_payload"] = settlement_payload
 
