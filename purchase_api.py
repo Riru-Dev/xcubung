@@ -164,7 +164,7 @@ def show_multipayment(
     payment_method: str,
     wallet_number: str = ""
 ):
-    print(f"Processing multipayment with method={payment_method}, wallet={wallet_number}")
+    print(f"Melanjutkan pembayaran dengan metode {payment_method} ...")
 
     payment_methods_data = get_payment_methods(
         api_key=api_key,
@@ -176,7 +176,6 @@ def show_multipayment(
     token_payment = payment_methods_data["token_payment"]
     ts_to_sign = payment_methods_data["timestamp"]
 
-    # Settlement langsung tanpa input()
     settlement_response = settlement_multipayment(
         api_key,
         tokens,
@@ -189,28 +188,19 @@ def show_multipayment(
         payment_method
     )
 
-    if not settlement_response or settlement_response.get("status") != "SUCCESS":
+    if settlement_response.get("status") != "SUCCESS":
         return {
             "error": "Failed to initiate settlement",
             "raw": settlement_response
         }
 
-    # Semua metode diperlakukan sama: cek deeplink
     deeplink = settlement_response["data"].get("deeplink", "")
-
-    result = {
+    return {
         "status": "SUCCESS",
-        "method": payment_method,
-        "wallet_number": wallet_number,
-        "transaction": settlement_response["data"]
+        "payment_method": payment_method,
+        "deeplink": deeplink or None,
+        "data": settlement_response["data"]
     }
-
-    if deeplink:
-        result["deeplink"] = deeplink
-    else:
-        result["message"] = f"Silahkan buka aplikasi {payment_method} untuk menyelesaikan pembayaran."
-
-    return result
 
 def settlement_qris(
     api_key: str,
