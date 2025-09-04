@@ -417,84 +417,100 @@ def send_payment_request(
         return resp.text
 
 def purchase_package(api_key: str, tokens: dict, package_option_code: str, price_override: int | None = None) -> dict:
-    package_details_data = get_package(api_key, tokens, package_option_code)
-    if not package_details_data:
-        return {"error": "Failed to get package details for purchase."}
-    
-    token_confirmation = package_details_data["token_confirmation"]
-    payment_target = package_details_data["package_option"]["package_option_code"]
-    price = package_details_data["package_option"]["price"]
+    try:
+        package_details_data = get_package(api_key, tokens, package_option_code)
+        if not package_details_data:
+            return {"error": "Failed to get package details for purchase."}
+        
+        token_confirmation = package_details_data["token_confirmation"]
+        payment_target = package_details_data["package_option"]["package_option_code"]
+        price = package_details_data["package_option"]["price"]
 
-    # gunakan harga override kalau ada, kalau tidak pakai default
-    amount_int = price_override if price_override is not None else price
-    
-    payment_path = "payments/api/v8/payment-methods-option"
-    payment_payload = {
-        "payment_type": "PURCHASE",
-        "is_enterprise": False,
-        "payment_target": payment_target,
-        "lang": "en",
-        "is_referral": False,
-        "token_confirmation": token_confirmation
-    }
-    
-    payment_res = send_api_request(api_key, payment_path, payment_payload, tokens["id_token"], "POST")
-    if payment_res.get("status") != "SUCCESS":
-        return {"error": "Failed to initiate payment", "raw": payment_res}
-    
-    token_payment = payment_res["data"]["token_payment"]
-    ts_to_sign = payment_res["data"]["timestamp"]
-    
-    # Settlement request
-    settlement_payload = {
-        "total_discount": 0,
-        "is_enterprise": False,
-        "payment_token": "",
-        "token_payment": token_payment,
-        "activated_autobuy_code": "",
-        "cc_payment_type": "",
-        "is_myxl_wallet": False,
-        "pin": "",
-        "ewallet_promo_id": "",
-        "members": [],
-        "total_fee": 0,
-        "fingerprint": "",
-        "autobuy_threshold_setting": {"label": "", "type": "", "value": 0},
-        "is_use_point": False,
-        "lang": "en",
-        "payment_method": "BALANCE",
-        "timestamp": int(time.time()),
-        "points_gained": 0,
-        "can_trigger_rating": False,
-        "akrab_members": [],
-        "akrab_parent_alias": "",
-        "referral_unique_code": "",
-        "coupon": "",
-        "payment_for": "BUY_PACKAGE",
-        "with_upsell": False,
-        "topup_number": "",
-        "stage_token": "",
-        "authentication_id": "",
-        "encrypted_payment_token": build_encrypted_field(urlsafe_b64=True),
-        "token": "",
-        "token_confirmation": token_confirmation,
-        "access_token": tokens["access_token"],
-        "wallet_number": "",
-        "encrypted_authentication_id": build_encrypted_field(urlsafe_b64=True),
-        "additional_data": {},
-        "total_amount": amount_int,
-        "is_using_autobuy": False,
-        "items": [{
-            "item_code": payment_target,
-            "product_type": "",
-            "item_price": amount_int,   # ← kalau diubah, item_price ikut diubah
-            "item_name": "",
-            "tax": 0
-        }]
-    }
-    
-    purchase_result = send_payment_request(
-        api_key, settlement_payload, tokens["access_token"], tokens["id_token"], token_payment, ts_to_sign
-    )
-    
-    return purchase_result
+        # kalau ada override pakai itu
+        amount_int = price_override if price_override is not None else price
+
+        # Step 1: init payment
+        payment_path = "payments/api/v8/payment-methods-option"
+        payment_payload = {
+            "payment_type": "PURCHASE",
+            "is_enterprise": False,
+            "payment_target": payment_target,
+            "lang": "en",
+            "is_referral": False,
+            "token_confirmation": token_confirmation
+        }
+
+        payment_res = send_api_request(api_key, payment_path, payment_payload, tokens["id_token"], "POST")
+        if not payment_res:
+            return {"error": "Payment init return None"}
+
+        # kalau gagal, balikin raw apa adanya
+        if payment_res.get("status") != "SUCCESS":
+            return {"error": "Failed to initiate payment", "raw": payment_res}
+
+        token_payment = payment_res["data"]["token_payment"]
+        ts_to_sign = payment_res["data"]["timestamp"]
+
+        # Step 2: settlement
+        settlement_payload = {
+            "total_discount": 0,
+            "is_enterprise": False,
+            "payment_token": "",
+            "token_payment": token_payment,
+            "activated_autobuy_code": "",
+            "cc_payment_type": "",
+            "is_myxl_wallet": False,
+            "pin": "",
+            "ewallet_promo_id": "",
+            "members": [],
+            "total_fee": 0,
+            "fingerprint": "",
+            "autobuy_threshold_setting": {"label": "", "type": "", "value": 0},
+            "is_use_point": False,
+            "lang": "en",
+            "payment_method": "BALANCE",
+            "timestamp": int(time.time()),
+            "points_gained": 0,
+            "can_trigger_rating": False,
+            "akrab_members": [],
+            "akrab_parent_alias": "",
+            "referral_unique_code": "",
+            "coupon": "",
+            "payment_for": "BUY_PACKAGE",
+            "with_upsell": False,
+            "topup_number": "",
+            "stage_token": "",
+            "authentication_id": "",
+            "encrypted_payment_token": build_encrypted_field(urlsafe_b64=True),
+            "token": "",
+            "token_confirmation": token_confirmation,
+            "access_token": tokens["access_token"],
+            "wallet_number": "",
+            "encrypted_authentication_id": build_encrypted_field(urlsafe_b64=True),
+            "additional_data": {},
+            "total_amount": amount_int,
+            "is_using_autobuy": False,
+            "items": [{
+                "item_code": payment_target,
+                "product_type": "",
+                "item_price": amount_int,
+                "item_name": "",
+                "tax": 0
+            }]
+        }
+
+        purchase_result = send_payment_request(
+            api_key, settlement_payload,
+            tokens["access_token"], tokens["id_token"],
+            token_payment, ts_to_sign
+        )
+
+        # Selalu balikin raw result
+        return {
+            "settlement_payload": settlement_payload,
+            "purchase_result": purchase_result
+        }
+
+    except Exception as e:
+        # biar ga 500 crash, tetap balikin error
+        return {"error": str(e)}
