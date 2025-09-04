@@ -251,3 +251,18 @@ def show_qris_payment(api_key, tokens, package_option_code, token_confirmation, 
         return {"error": "failed to fetch qris", "raw": res}
 
     return {"transaction_id": txid, "qr_code": res["data"]["qr_code"]}
+
+def get_qris_code(api_key: str, tokens: dict, transaction_id: str):
+    path = "payments/api/v8/pending-detail"
+    payload = {
+        "transaction_id": transaction_id,
+        "is_enterprise": False,
+        "lang": "en",
+        "status": ""
+    }
+
+    res = send_api_request(api_key, path, payload, tokens["id_token"], "POST")
+    if res.get("status") != "SUCCESS":
+        return {"error": "Failed to fetch QRIS code", "raw": res}
+
+    return res["data"]["qr_code"]
