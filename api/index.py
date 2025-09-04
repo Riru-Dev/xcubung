@@ -68,7 +68,7 @@ def request_otp(body: OTPRequest):
     sub_id = get_otp(body.contact)
     if not sub_id:
         raise HTTPException(status_code=400, detail="Failed to request OTP. Check the number format (start with 628).")
-    return {"subscriber_id": sub_id}
+    return sub_id
 
 @app.post("/otp/verify")
 def verify_otp(body: OTPVerify):
